@@ -48,37 +48,28 @@ namespace DogWalker.Controllers
 
                     while (reader.Read())
                     {
-                        int id = reader.GetInt32(reader.GetOrdinal("Id"));
-                        int OwnerId = reader.GetInt32(reader.GetOrdinal("OwnerId"));
-                        string PhoneNumber = reader.GetString(reader.GetOrdinal("PhoneNumber"));
-                        string Breed = reader.GetString(reader.GetOrdinal("Breed"));
-                        string Notes = reader.GetString(reader.GetOrdinal("Notes"));
-                        string DogName = reader.GetString(reader.GetOrdinal("DogName"));
-                        string OwnerName = reader.GetString(reader.GetOrdinal("OwnerName"));
-                        int NeighborhoodId = reader.GetInt32(reader.GetOrdinal("NeighborhoodId"));
-
-
-                        Owner owner = new Owner
-                        {
-                            Id = OwnerId,
-                            Name = OwnerName,
-                            PhoneNumber = PhoneNumber,
-                            NeighborhoodId = NeighborhoodId
-
-                        };
-
                         Dog dog = new Dog
                         {
-                            Id = id,
-                            DogOwnerId = OwnerId,
-                            Owner  = owner,
-                            DogName = DogName,
-                            Breed = Breed,
-                            Notes = Notes
-                        };
+                            Id = reader.GetInt32(reader.GetOrdinal("Id")),
+                            Breed = reader.GetString(reader.GetOrdinal("Breed")),
+                            DogName = reader.GetString(reader.GetOrdinal("DogName")),
+                            Owner = new Owner
+                            {
+                                Id = reader.GetInt32(reader.GetOrdinal("OwnerId")),
+                                Name = reader.GetString(reader.GetOrdinal("OwnerName")),
+                                PhoneNumber = reader.GetString(reader.GetOrdinal("PhoneNumber")),
+                                NeighborhoodId = reader.GetInt32(reader.GetOrdinal("NeighborhoodId"))
 
-                        dogs.Add(dog);
-                    }
+                            }
+                        };
+                        if (!reader.IsDBNull(reader.GetOrdinal("Notes")))
+                        {
+                            dog.Notes = reader.GetString(reader.GetOrdinal("Notes"));
+                        }
+
+
+                    dogs.Add(dog);
+                     }
                     reader.Close();
                     return Ok(dogs);
                 }
@@ -112,7 +103,7 @@ namespace DogWalker.Controllers
                         int OwnerId = reader.GetInt32(reader.GetOrdinal("OwnerId"));
                         string PhoneNumber = reader.GetString(reader.GetOrdinal("PhoneNumber"));
                         string Breed = reader.GetString(reader.GetOrdinal("Breed"));
-                        string Notes = reader.GetString(reader.GetOrdinal("Notes"));
+                       /* string Notes = reader.GetString(reader.GetOrdinal("Notes"));*/
                         string DogName = reader.GetString(reader.GetOrdinal("DogName"));
                         string OwnerName = reader.GetString(reader.GetOrdinal("OwnerName"));
                         int NeighborhoodId = reader.GetInt32(reader.GetOrdinal("NeighborhoodId"));
@@ -134,8 +125,13 @@ namespace DogWalker.Controllers
                             Owner = owner,
                             DogName = DogName,
                             Breed = Breed,
-                            Notes = Notes
                         };
+
+                        if (!reader.IsDBNull(reader.GetOrdinal("Notes")))
+                        {
+                            dog.Notes = reader.GetString(reader.GetOrdinal("Notes"));
+                        }
+                      
 
                     }
                     reader.Close();
@@ -161,7 +157,7 @@ namespace DogWalker.Controllers
                     cmd.Parameters.Add(new SqlParameter("@DogName", dog.DogName));
                     cmd.Parameters.Add(new SqlParameter("@Breed", dog.Breed));
                     cmd.Parameters.Add(new SqlParameter("@DogOwnerId", dog.DogOwnerId));
-                    cmd.Parameters.Add(new SqlParameter("@Notes", dog.Notes));
+                    cmd.Parameters.Add(new SqlParameter("@Notes", (object) dog.Notes ?? DBNull.Value));
 
                     int newId = (int)cmd.ExecuteScalar();
                     dog.Id = newId;
@@ -173,8 +169,52 @@ namespace DogWalker.Controllers
         //end post new dog
 
         //edit dog
+        [HttpPut("{id}")]
+        public async Task<IActionResult> Put([FromRoute] int id, [FromBody] Dog dog)
+        {
+            try
+            {
+                using(SqlConnection conn = Connection)
+                {
+                    conn.Open();
+                    using(SqlCommand cmd = conn.CreateCommand())
+                    {
+                        cmd.CommandText = @"
+                                            UPDATE Dog 
+                                            SET DogName = @dogName, 
+                                            Breed = @breed,
+                                            DogOwnerId = @dogOwnerId, 
+                                            Notes = @notes
+                                            WHERE Id = @id";
+                        cmd.Parameters.Add(new SqlParameter("@DogName", dog.DogName));
+                        cmd.Parameters.Add(new SqlParameter("@Breed", dog.Breed));
+                        cmd.Parameters.Add(new SqlParameter("@DogOwnerId", dog.DogOwnerId));
+                        cmd.Parameters.Add(new SqlParameter("@Notes", (object) dog.Notes ?? DBNull.Value));
+                        cmd.Parameters.Add(new SqlParameter("@id", id));
 
+                        int rowsAffected = cmd.ExecuteNonQuery();
+                        if (rowsAffected > 0) {
+                            return new StatusCodeResult(StatusCodes.Status204NoContent);
+                        }
+                        throw new Exception("No rows affected");
+
+                    }
+                }
+            }
+            catch(Exception)
+            {
+                if (!DogExists(id))
+                {
+                    return NotFound();
+                }
+                else
+                {
+                    throw;
+                }
+            }
+        }
         //end edit dog
+
 
         //delete dog
         [HttpDelete("{id}")]
